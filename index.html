@@ -758,8 +758,8 @@ async function tcClasify(mov, resp) {
     var nxt = tcPending[0];
     chatAddMsg("bot","Registrado como \""+resp+"\".\n\n¿El gasto de $"+(nxt.monto||0).toLocaleString("es-CL")+" en \""+nxt.descripcion+"\" qué es?");
   } else {
-    chatAddMsg("bot","✅ Listo! Todos clasificados. Revisa el Resumen.");
-    renderMovs(); renderResumen();
+    chatAddMsg("bot","Todos clasificados. Actualizando datos...");
+    loadAll();
   }
 }
 
@@ -767,10 +767,9 @@ async function tcAnalizar() {
   var valid = tcFiles.filter(Boolean);
   if (!valid.length) { toast("Sube al menos una cartola","err"); return; }
   var tarjeta = get("tc-tarjeta");
-  var periodo = get("tc-periodo") || (MESES[curMes-1]+" "+curAnio);
+  var periodoManual = get("tc-periodo");
 
   document.getElementById("chat-wrap").className = "chat open";
-  set("chat-title","Revisión · "+tarjeta+" · "+periodo);
   document.getElementById("chat-msgs").innerHTML = "";
   tcPending = [];
 
@@ -781,64 +780,97 @@ async function tcAnalizar() {
   if (txt)  txt.textContent = "Analizando...";
   if (btn)  btn.disabled = true;
 
-  var gfRef = GF.map(function(r,i){return (i+1)+":"+r[1]+"("+r[0]+")";}).join(",");
-
-  for (var fi=0; fi<valid.length; fi++) {
+  for (var fi = 0; fi < valid.length; fi++) {
     var cf = valid[fi];
-    if (valid.length > 1) chatAddMsg("bot","Procesando "+(fi+1)+"/"+valid.length+": "+cf.name+"...");
+    if (valid.length > 1) {
+      chatAddMsg("bot", "Procesando " + (fi+1) + "/" + valid.length + ": " + cf.name + "...");
+    }
     try {
-      var d = await apiFetch("/analizar-tc","POST",{
-        base64:cf.b64, mimeType:cf.mime, tarjeta:tarjeta, periodo:periodo, gfCatalog:GF
+      var d = await apiFetch("/analizar-tc", "POST", {
+        base64: cf.b64,
+        mimeType: cf.mime,
+        tarjeta: tarjeta,
+        periodo: periodoManual || (MESES[curMes-1] + " " + curAnio),
+        gfCatalog: GF
       });
+
+      // ── Usar mes/anio detectado por Claude desde la cartola ──
+      var mesMov  = d.mes_detectado  || curMes;
+      var anioMov = d.anio_detectado || curAnio;
+      if (d.mes_detectado && (d.mes_detectado !== curMes || d.anio_detectado !== curAnio)) {
+        chatAddMsg("bot", "📅 Detecté que esta cartola es de " + (d.periodo_detectado || MESES[mesMov-1] + " " + anioMov) + ". Guardando en ese mes.");
+      }
+
+      // ── Guardar movimientos ──
       var saved = [];
-      for (var mi=0; mi<(d.movimientos||[]).length; mi++) {
+      for (var mi = 0; mi < (d.movimientos || []).length; mi++) {
         var mov = d.movimientos[mi];
         try {
-          var r = await apiFetch("/movimientos_tc","POST",{
-            tarjeta:tarjeta, mes:curMes, anio:curAnio,
-            fecha:mov.fecha||null, descripcion:mov.descripcion,
-            monto:mov.monto, moneda:mov.moneda||"CLP",
-            categoria:mov.categoria||"Otros",
-            gf_item_id:mov.gf_item_id||null,
-            es_gasto_fijo:mov.es_gasto_fijo||false,
-            revisado:mov.revisado!==false
+          var r = await apiFetch("/movimientos_tc", "POST", {
+            tarjeta:      tarjeta,
+            mes:          mesMov,
+            anio:         anioMov,
+            fecha:        mov.fecha || null,
+            descripcion:  mov.descripcion,
+            monto:        mov.monto,
+            moneda:       mov.moneda || "CLP",
+            categoria:    mov.categoria || "Otros",
+            gf_item_id:   mov.gf_item_id || null,
+            es_gasto_fijo: mov.es_gasto_fijo || false,
+            revisado:     mov.revisado !== false
           });
-          saved.push(Object.assign({},mov,{id:r.movimiento?r.movimiento.id:Math.random()}));
-        } catch(ex) {}
+          saved.push(Object.assign({}, mov, {id: r.movimiento ? r.movimiento.id : Math.random()}));
+        } catch(ex) {
+          console.error("Error guardando movimiento:", ex.message);
+        }
       }
-      movList = movList.concat(saved);
+
+      // ── Auto-completar gastos fijos detectados ──
       saved.forEach(function(mov) {
-        if (mov.es_gasto_fijo&&mov.gf_item_id&&mov.monto) {
-          var id=mov.gf_item_id;
-          if(!gfRegs[id]) gfRegs[id]={monto:0,estado:"pendiente",nota:""};
-          gfRegs[id].monto=mov.monto;
-          apiFetch("/gf/registros/"+id+"/"+curMes+"/"+curAnio,"PATCH",{monto:mov.monto,pagado_con_tc:true}).catch(function(){});
+        if (mov.es_gasto_fijo && mov.gf_item_id && mov.monto) {
+          var id = mov.gf_item_id;
+          if (!gfRegs[id]) gfRegs[id] = {monto: 0, estado: "pendiente", nota: ""};
+          gfRegs[id].monto = mov.monto;
+          apiFetch("/gf/registros/" + id + "/" + mesMov + "/" + anioMov, "PATCH",
+            {monto: mov.monto, pagado_con_tc: true}).catch(function(){});
         }
       });
-      renderMovs(); renderGF(); renderResumen();
-      var pending = (d.dudosos||[]).map(function(i){return saved[i];}).filter(Boolean);
-      tcPending = tcPending.concat(pending);
-      var autoMsg = "Extraje "+saved.length+" movimientos.\n"
-        +"✅ "+saved.filter(function(m){return m.es_gasto_fijo;}).length+" gastos fijos completados.\n"
-        +"💰 Total: $"+(d.total||0).toLocaleString("es-CL")
-        +(d.resumen?"\n\n"+d.resumen:"");
-      chatAddMsg("bot",autoMsg);
+
+      movList = movList.concat(saved);
+
+      // ── Mensaje resumen ──
+      var fijosCount = saved.filter(function(m) { return m.es_gasto_fijo; }).length;
+      var autoMsg = ["Extraje " + saved.length + " movimientos de " + cf.name + ".", "Gastos fijos completados: " + fijosCount, "Total: $" + (d.total || 0).toLocaleString("es-CL")].join("\n") + (d.resumen ? "\n\n" + d.resumen : "");
+      chatAddMsg("bot", autoMsg);
+
+      // ── Acumular dudosos para preguntar ──
+      var nuevoDudosos = (d.dudosos || []).map(function(i) { return saved[i]; }).filter(Boolean);
+      tcPending = tcPending.concat(nuevoDudosos);
+
     } catch(e) {
-      chatAddMsg("bot","❌ Error en "+cf.name+": "+e.message);
+      chatAddMsg("bot", "❌ Error en " + cf.name + ": " + e.message);
     }
+  }
+
+  // ── Renderizar TODO después de procesar todas las cartolas ──
+  // Actualizar mes selector al mes detectado si cambió
+  if (movList.length > 0) {
+    // Recargar todos los datos del mes correcto desde el servidor
+    await loadAll();
   }
 
   if (icon) icon.textContent = "✨";
   if (txt)  txt.textContent  = "Analizar con Claude";
   if (btn)  btn.disabled = false;
 
+  // ── Preguntar por dudosos ──
   if (tcPending.length > 0) {
     var f = tcPending[0];
     setTimeout(function() {
-      chatAddMsg("bot","Tengo "+tcPending.length+" movimiento(s) dudoso(s).\n\n¿El gasto de $"+(f.monto||0).toLocaleString("es-CL")+" en \""+f.descripcion+"\" qué es?");
+chatAddMsg("bot", "Tengo " + tcPending.length + " gasto(s) dudosos importantes. El gasto de $" + (f.monto||0).toLocaleString("es-CL") + " en \"" + f.descripcion + "\" (" + (f.fecha||"sin fecha") + ") - ?que es? Responde: Restaurantes, Salud, Ropa/Shopping, Viajes, Hogar u Otro");
     }, 400);
-  } else if (valid.length > 1) {
-    chatAddMsg("bot","✅ Procesé "+valid.length+" cartolas. Todo listo.");
+  } else if (valid.length > 0) {
+    chatAddMsg("bot", "✅ Todo listo! Los datos ya están en Resumen, Gastos fijos y Movimientos.");
   }
 }
 
