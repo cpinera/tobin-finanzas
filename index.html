@@ -738,7 +738,7 @@ function onMesChange() {
 }
 
 function switchTab(tab) {
-  ["resumen","fijos","ingresos","cartolas","subs"].forEach(function(t) {
+  ["resumen","directos","ingresos","cartolas","subs"].forEach(function(t) {
     document.getElementById("view-"+t).style.display = t===tab?"block":"none";
     document.getElementById("tab-"+t).className = "nav-tab"+(t===tab?" active":"");
   });
@@ -836,15 +836,17 @@ function renderGFGroup(items, containerId, esTC) {
       if (r.estado==="pagado") pagados++;
     });
     var allPaid = catItems.length > 0 && pagados === catItems.length;
+    // Section header (non-collapsible for GF)
     html += '<div class="sec" style="margin-bottom:10px">';
-    var secId = 'gf'+cat.replace(/[^a-z0-9]/gi,'_')+String(esTC?1:0);
-    html += '<div class="sec-head" onclick="toggleSec(\'' + secId + '\')">'; 
-    html += '<span class="sec-title" style="font-size:13px">'+esc(cat)+'</span>';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--surface2);border-bottom:1px solid var(--border)">';
+    html += '<span style="font-size:13px;font-weight:700;flex:1">'+esc(cat)+'</span>';
     html += '<span class="sec-badge '+(allPaid?"ok":"warn")+'">$'+fmt(total)+' · '+pagados+'/'+catItems.length+'</span>';
-    html += '<span class="sec-arrow" id="arr-gf'+cat.replace(/[^a-z0-9]/gi,'_')+esTC+'">▶</span>';
     html += '</div>';
-    html += '<div class="sec-body" id="body-'+secId+'">';
-    html += '<div class="tbl-head" style="grid-template-columns:28px 1fr 130px 110px"><div></div><div class="th">Item</div><div class="th" style="text-align:right">Monto</div><div class="th">Estado</div></div>';
+    // Always-open body
+    html += '<div style="display:block">';
+    html += '<div class="tbl-head" style="grid-template-columns:28px 1fr 130px 110px">';
+    html += '<div></div><div class="th">Item</div>';
+    html += '<div class="th" style="text-align:right">Monto</div><div class="th">Estado</div></div>';
     catItems.forEach(function(item) {
       html += gfRowHtml(item[0], item[2], esTC, "28px 1fr 130px 110px");
     });
@@ -853,6 +855,7 @@ function renderGFGroup(items, containerId, esTC) {
   var el = document.getElementById(containerId);
   if (el) el.innerHTML = html||'<div class="empty">Sin items.</div>';
 }
+
 
 function renderGFManual() { renderGFGroup(GF_MANUAL,"gf-manual-list",false); }
 function renderGFTC()     { renderGFGroup(GF_TC,"gf-tc-list",true); }
