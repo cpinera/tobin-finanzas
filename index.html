@@ -756,9 +756,13 @@ async function tcClasify(mov, resp) {
   tcPending.shift();
   if (tcPending.length > 0) {
     var nxt = tcPending[0];
-    chatAddMsg("bot","Registrado como \""+resp+"\".\n\n¿El gasto de $"+(nxt.monto||0).toLocaleString("es-CL")+" en \""+nxt.descripcion+"\" qué es?");
+    var hint = "Opciones: Restaurantes, Alimentacion Familia, Salud, Ropa/Shopping, Hogar, Viajes, Suscripciones, Otro";
+    if (nxt.descripcion && /app|sub|premium|plus|pro|plan|monthly|annual|soft/i.test(nxt.descripcion)) {
+      hint = "Parece suscripcion o software. Responde: Suscripciones / Software / Otro";
+    }
+    chatAddMsg("bot", "Registrado como \"" + resp + "\".\n\n¿El gasto de $" + (nxt.monto||0).toLocaleString("es-CL") + " en \"" + nxt.descripcion + "\" (" + (nxt.fecha||"sin fecha") + ") que es?\n" + hint);
   } else {
-    chatAddMsg("bot","Todos clasificados. Actualizando datos...");
+    chatAddMsg("bot","Todos clasificados. Actualizando...");
     loadAll();
   }
 }
@@ -879,7 +883,7 @@ var CAT_COLORS = {
   "Colegios":"#e6f4ea:#16a34a","Tarjetas de Crédito":"#eff6ff:#2563eb",
   "Alimentacion Familia":"#f0fdf4:#16a34a","Alimentación Familia":"#f0fdf4:#16a34a",
   "Viajes":"#fffbeb:#d97706","Ropa/Shopping":"#f5f3ff:#7c3aed",
-  "Salud":"#fef2f2:#dc2626","Software":"#ecfeff:#0891b2",
+  "Salud":"#fef2f2:#dc2626","Software":"#ecfeff:#0891b2","Suscripciones":"#ecfeff:#0891b2","Suscripciones":"#ecfeff:#0891b2",
   "Deporte":"#f0fdf4:#16a34a","Restaurantes":"#fffbeb:#d97706",
   "Transporte":"#f8fafc:#718096","Entretenimiento":"#fce7f3:#db2777",
   "Educacion":"#ecfeff:#0891b2","Hogar":"#f5f3ff:#7c3aed","Otros":"#f1f5f9:#64748b"
