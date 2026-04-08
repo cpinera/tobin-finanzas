@@ -756,13 +756,29 @@ async function tcClasify(mov, resp) {
   tcPending.shift();
   if (tcPending.length > 0) {
     var nxt = tcPending[0];
-    var hint = "Opciones: Restaurantes, Alimentacion Familia, Salud, Ropa/Shopping, Hogar, Viajes, Suscripciones, Otro";
-    if (nxt.descripcion && /app|sub|premium|plus|pro|plan|monthly|annual|soft/i.test(nxt.descripcion)) {
-      hint = "Parece suscripcion o software. Responde: Suscripciones / Software / Otro";
+    var razon = nxt._razon || "";
+    var monto = "$" + (nxt.monto||0).toLocaleString("es-CL");
+    var desc = "\"" + (nxt.descripcion||"") + "\" (" + (nxt.fecha||"sin fecha") + ")";
+    var msg, hint;
+    if (razon === "suscripcion_nueva") {
+      msg = "Registrado.\n\n\uD83D\uDEA8 SUSCRIPCION NUEVA detectada: " + monto + " en " + desc;
+      hint = "Confirma: Suscripciones / No es suscripcion / Cancelar";
+    } else if (razon === "cambio_monto") {
+      msg = "Registrado.\n\n\u26A0\uFE0F CAMBIO DE MONTO en suscripcion: " + monto + " en " + desc;
+      hint = "Confirma: Correcto / Es un error / Suscripcion cancelada";
+    } else if (razon === "suscripcion_detectada") {
+      msg = "Registrado.\n\n\uD83D\uDCCB Suscripcion detectada este mes: " + monto + " en " + desc;
+      hint = "Confirma: Activa / Ya no la tengo";
+    } else if (/app|sub|premium|plus|pro|plan|monthly|annual|soft/i.test(nxt.descripcion||"")) {
+      msg = "Registrado.\n\n\uD83D\uDD14 Posible suscripcion no reconocida: " + monto + " en " + desc;
+      hint = "Que es? Suscripciones / Software / Restaurantes / Salud / Otro";
+    } else {
+      msg = "Registrado.\n\nGasto de " + monto + " en " + desc;
+      hint = "Que es? Restaurantes / Alimentacion Familia / Salud / Ropa/Shopping / Hogar / Viajes / Suscripciones / Otro";
     }
-    chatAddMsg("bot", "Registrado como \"" + resp + "\".\n\n¿El gasto de $" + (nxt.monto||0).toLocaleString("es-CL") + " en \"" + nxt.descripcion + "\" (" + (nxt.fecha||"sin fecha") + ") que es?\n" + hint);
+    chatAddMsg("bot", msg + "\n\n" + hint);
   } else {
-    chatAddMsg("bot","Todos clasificados. Actualizando...");
+    chatAddMsg("bot","\u2705 Todos clasificados. Actualizando...");
     loadAll();
   }
 }
@@ -848,7 +864,15 @@ async function tcAnalizar() {
       chatAddMsg("bot", autoMsg);
 
       // ── Acumular dudosos para preguntar ──
-      var nuevoDudosos = (d.dudosos || []).map(function(i) { return saved[i]; }).filter(Boolean);
+      // dudosos puede ser array de indices O array de {idx, razon}
+      var rawDudosos = d.dudosos || [];
+      var nuevoDudosos = rawDudosos.map(function(item) {
+        var idx = typeof item === 'object' ? item.idx : item;
+        var razon = typeof item === 'object' ? item.razon : null;
+        var mov = saved[idx];
+        if (mov) mov._razon = razon;
+        return mov;
+      }).filter(Boolean);
       tcPending = tcPending.concat(nuevoDudosos);
 
     } catch(e) {
