@@ -488,7 +488,42 @@ body {
       <div style="font-size:20px;font-weight:700" id="directos-titulo">Gastos directos</div>
       <div style="font-size:13px;color:var(--muted);margin-top:3px">Los TC se completan automáticamente al analizar cartolas</div>
     </div>
-    <button class="btn btn-ghost" onclick="generarMes()">+ Iniciar mes</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="showAddGFItem()" title="Agregar item fijo">+ Nuevo item</button>
+      <button class="btn btn-ghost" onclick="generarMes()">Iniciar mes</button>
+    </div>
+  </div>
+
+  <!-- Add new GF item inline form (hidden by default) -->
+  <div id="add-gf-form" style="display:none;background:var(--blue-l);border:1px solid rgba(26,74,140,.2);border-radius:var(--r);padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">Nuevo item de gasto fijo</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Categoría</div>
+        <select class="add-sel" id="new-gf-cat">
+          <option>Créditos</option>
+          <option>Sueldos</option>
+          <option>Trimestrales</option>
+          <option>Seguros</option>
+          <option>Colegios</option>
+          <option>Servicios</option>
+          <option>Otros</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Nombre</div>
+        <input class="add-inp" id="new-gf-nombre" placeholder="Ej: Hipotecario BCI" style="width:100%"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Tipo</div>
+        <select class="add-sel" id="new-gf-tipo">
+          <option value="false">Transferencia directa</option>
+          <option value="true">Via TC (auto-detectado)</option>
+        </select>
+      </div>
+      <button class="btn btn-dark" onclick="addGFItem()">Agregar</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('add-gf-form').style.display='none'">Cancelar</button>
+    </div>
   </div>
 
   <!-- Manual transfers -->
@@ -514,6 +549,14 @@ body {
       <select class="add-sel" id="new-pago-mon"><option value="CLP">CLP</option><option value="USD">USD</option></select>
       <button class="btn btn-dark" onclick="addPagoManual()">+ Registrar</button>
     </div>
+  </div>
+
+  <!-- Pagos directos registrados este mes -->
+  <div class="sec" style="margin-bottom:16px">
+    <div style="padding:11px 20px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Pagos registrados este mes</span>
+    </div>
+    <div id="gastos-direct-list"></div>
   </div>
 
   <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Checklist de pagos recurrentes</div>
@@ -630,30 +673,10 @@ var curMes, curAnio;
 var gfRegs = {}, ingList = [], movList = [], tcPending = [], tcFiles = [];
 
 // ── Gastos directos: separados en manuales (transferencia) y TC (auto) ──
-var GF_MANUAL = [
-  // [id, categoria, nombre]
-  [10, "Créditos",     "Hipotecario Oficina"],
-  [11, "Créditos",     "Hipotecario Terreno"],
-  [12, "Créditos",     "Hip. Santander 1"],
-  [13, "Créditos",     "Hip. Santander 2"],
-  [14, "Sueldos",      "Gabriel"],
-  [15, "Sueldos",      "Jessy"],
-  [16, "Sueldos",      "Ricardo"],
-  [20, "Trimestrales", "Contribuciones SII"],
-  [21, "Trimestrales", "Club de Golf Cachagua"],
-  [22, "Trimestrales", "Club de Golf Santiago"]
-];
-
-var GF_TC = [
-  // [id, categoria, nombre] — estos se auto-completan desde cartolas
-  [17, "Colegios",  "VMA"],
-  [18, "Colegios",  "Cordillera (3 hijos)"],
-  [19, "Colegios",  "Cantagallo"],
-  [23, "Seguros",   "Seguro Auto 1"],
-  [24, "Seguros",   "Seguro Auto 2"],
-  [25, "Seguros",   "Seguro Auto 3"],
-  [9,  "Servicios", "Starlink (Internet Cachagua)"]
-];
+// GF arrays loaded from Supabase gf_items table
+var GF_MANUAL = []; // es_tc = false
+var GF_TC     = []; // es_tc = true
+var GF_ALL_ITEMS = []; // raw from Supabase
 
 // ── Suscripciones conocidas ──
 var SUBS_CONOCIDAS = [
@@ -761,21 +784,30 @@ async function loadAll() {
   set("directos-titulo","Gastos directos · "+MESES[curMes-1]+" "+curAnio);
   try {
     var results = await Promise.allSettled([
+      apiFetch("/gf/items"),
       apiFetch("/gf/registros?mes="+curMes+"&anio="+curAnio),
       apiFetch("/ingresos?mes="+curMes+"&anio="+curAnio),
       apiFetch("/movimientos_tc?mes="+curMes+"&anio="+curAnio),
-      apiFetch("/notas_mes?mes="+curMes+"&anio="+curAnio)
+      apiFetch("/notas_mes?mes="+curMes+"&anio="+curAnio),
+      apiFetch("/gastos_directos?mes="+curMes+"&anio="+curAnio)
     ]);
-    gfRegs = {};
+    // Update GF arrays from Supabase
     if (results[0].status==="fulfilled") {
-      (results[0].value.registros||[]).forEach(function(r){ gfRegs[r.item_id]=r; });
+      GF_ALL_ITEMS = results[0].value.items || [];
+      GF_MANUAL = GF_ALL_ITEMS.filter(function(i){return !i.es_tc && i.activo!==false;}).map(function(i){return [i.id, i.categoria, i.nombre];});
+      GF_TC     = GF_ALL_ITEMS.filter(function(i){return i.es_tc  && i.activo!==false;}).map(function(i){return [i.id, i.categoria, i.nombre];});
     }
-    ingList = results[1].status==="fulfilled"?(results[1].value.ingresos||[]):[];
-    movList = results[2].status==="fulfilled"?(results[2].value.movimientos||[]):[];
-    if (results[3].status==="fulfilled" && results[3].value.nota!==undefined) {
+    gfRegs = {};
+    if (results[1].status==="fulfilled") {
+      (results[1].value.registros||[]).forEach(function(r){ gfRegs[r.item_id]=r; });
+    }
+    ingList = results[2].status==="fulfilled"?(results[2].value.ingresos||[]):[];
+    movList = results[3].status==="fulfilled"?(results[3].value.movimientos||[]):[];
+    if (results[4].status==="fulfilled" && results[4].value.nota!==undefined) {
       var ta = document.getElementById("nota-ta");
-      if (ta) ta.value = results[3].value.nota||"";
+      if (ta) ta.value = results[4].value.nota||"";
     }
+    window.gastosDirect = results[5].status==="fulfilled" ? (results[5].value.gastos||[]) : [];
     renderAll();
   } catch(e) {
     toast("Error cargando datos: "+e.message,"err");
@@ -785,10 +817,34 @@ async function loadAll() {
 function renderAll() {
   renderGFManual();
   renderGFTC();
+  renderGastosDirect();
   renderIng();
   renderMovs();
   renderResumen();
   renderSubsDetectadas();
+}
+
+function renderGastosDirect() {
+  var gastos = window.gastosDirect || [];
+  var el = document.getElementById("gastos-direct-list"); if(!el) return;
+  if (!gastos.length) { el.innerHTML = '<div style="padding:10px 20px;font-size:13px;color:var(--muted)">Sin pagos directos registrados este mes.</div>'; return; }
+  el.innerHTML = gastos.map(function(g) {
+    var monto = Math.abs(parseFloat(g.monto)||0);
+    var desc = g.descripcion||"";
+    return '<div style="display:grid;grid-template-columns:1fr 130px 28px;gap:8px;align-items:center;padding:10px 20px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:13px">'+esc(desc)+'</div>'
+      +'<div class="mono" style="font-size:13px;font-weight:600;text-align:right">$'+fmt(monto)+'</div>'
+      +'<button class="btn btn-ghost" style="padding:3px 7px;font-size:12px;color:var(--red)" onclick="delGastoDirect('+g.id+')">✕</button>'
+      +'</div>';
+  }).join("");
+}
+
+async function delGastoDirect(id) {
+  try {
+    await apiFetch("/gastos_directos/"+id,"DELETE");
+    window.gastosDirect = (window.gastosDirect||[]).filter(function(g){return g.id!==id;});
+    renderGastosDirect(); renderResumen(); toast("Eliminado");
+  } catch(e) { toast(e.message,"err"); }
 }
 
 // ── GF helpers ──
@@ -817,6 +873,7 @@ function gfRowHtml(id, nombre, esTC, cols) {
     + '<option value="pagado"'+(r.estado==="pagado"?" selected":"")+'>✅ Pagado</option>'
     + '<option value="no_aplica"'+(r.estado==="no_aplica"?" selected":"")+'>— N/A</option>'
     + '</select>'
+    + '<button class="btn btn-ghost" style="padding:3px 7px;font-size:12px;color:var(--red)" onclick="removeGFItem('+id+')" title="Desactivar item">✕</button>'
     + '</div>';
 }
 
@@ -848,7 +905,7 @@ function renderGFGroup(items, containerId, esTC) {
     html += '<div></div><div class="th">Item</div>';
     html += '<div class="th" style="text-align:right">Monto</div><div class="th">Estado</div></div>';
     catItems.forEach(function(item) {
-      html += gfRowHtml(item[0], item[2], esTC, "28px 1fr 130px 110px");
+      html += gfRowHtml(item[0], item[2], esTC, "28px 1fr 130px 110px 28px");
     });
     html += '</div></div>';
   });
@@ -881,6 +938,34 @@ async function gfMonto(id, val) {
   try { await apiFetch("/gf/registros/"+id+"/"+curMes+"/"+curAnio,"PATCH",{monto:monto}); }
   catch(e) { toast(e.message,"err"); }
 }
+function showAddGFItem() {
+  var form = document.getElementById("add-gf-form");
+  form.style.display = form.style.display==="none" ? "block" : "none";
+}
+
+async function addGFItem() {
+  var cat    = document.getElementById("new-gf-cat").value;
+  var nombre = document.getElementById("new-gf-nombre").value.trim();
+  var esTC   = document.getElementById("new-gf-tipo").value === "true";
+  if (!nombre) { toast("Escribe un nombre","err"); return; }
+  try {
+    await apiFetch("/gf/items","POST",{categoria:cat, nombre:nombre, es_tc:esTC, activo:true});
+    document.getElementById("new-gf-nombre").value = "";
+    document.getElementById("add-gf-form").style.display = "none";
+    await loadAll();
+    toast("Item agregado ✓");
+  } catch(e) { toast(e.message,"err"); }
+}
+
+async function removeGFItem(id) {
+  if (!confirm("¿Desactivar este item? Ya no aparecerá en los meses futuros.")) return;
+  try {
+    await apiFetch("/gf/items/"+id,"PATCH",{activo:false});
+    await loadAll();
+    toast("Item desactivado");
+  } catch(e) { toast(e.message,"err"); }
+}
+
 async function generarMes() {
   toast("Generando registros...");
   try { await apiFetch("/gf/generar","POST",{mes:curMes,anio:curAnio}); await loadAll(); toast("Mes iniciado ✓"); }
@@ -938,8 +1023,8 @@ function renderResumen() {
   var pagados  = allGF.filter(function(item){return reg(item[0]).estado==="pagado";}).length;
   var pendientes = allGF.filter(function(item){return reg(item[0]).estado==="pendiente" && (parseFloat(reg(item[0]).monto)||0)>0;}).length;
 
-  set("k-fijos","$"+fmt(totalGF));
-  set("k-fijos-sub",pagados+" de "+allGF.length+" pagados");
+  set("k-fijos","$"+fmt(totalGF + totalDirecto));
+  set("k-fijos-sub",pagados+" de "+allGF.length+" fijos · +"+(window.gastosDirect||[]).length+" directos");
   set("k-tc","$"+fmt(totalTC));
   set("k-tc-sub",movList.length+" movimientos");
   set("k-balance",(balance>=0?"+":"")+"$"+fmt(Math.abs(balance)));
@@ -1030,26 +1115,42 @@ async function addPagoManual() {
   var desc  = document.getElementById("new-pago-desc").value.trim();
   var monto = parseFloat(document.getElementById("new-pago-monto").value)||0;
   var mon   = document.getElementById("new-pago-mon").value;
+  var medio = document.getElementById("new-pago-medio").value;
   if (!desc)  { toast("Escribe una descripción","err"); return; }
   if (!monto) { toast("Ingresa un monto","err"); return; }
   try {
-    var d = await apiFetch("/movimientos_tc","POST",{
-      tarjeta:"Manual",
-      mes:curMes, anio:curAnio,
-      fecha:new Date().toISOString().slice(0,10),
-      descripcion:desc, monto:monto, moneda:mon,
-      categoria:cat, es_gasto_fijo:false, revisado:true
-    });
-    movList.push(Object.assign({},d.movimiento||{},{
-      tarjeta:"Manual", descripcion:desc, monto:monto,
-      moneda:mon, categoria:cat, revisado:true
-    }));
-    document.getElementById("new-pago-desc").value="";
-    document.getElementById("new-pago-monto").value="";
-    renderMovs(); renderResumen();
+    if (medio === "tc") {
+      // Pago con TC → va a movimientos_tc (aparece en Cartolas TC y en el balance de TC)
+      var d = await apiFetch("/movimientos_tc","POST",{
+        tarjeta: "Manual TC",
+        mes: curMes, anio: curAnio,
+        fecha: new Date().toISOString().slice(0,10),
+        descripcion: desc, monto: monto, moneda: mon,
+        categoria: cat, es_gasto_fijo: false, revisado: true
+      });
+      movList.push(Object.assign({}, d.movimiento||{}, {
+        tarjeta:"Manual TC", descripcion:desc, monto:monto,
+        moneda:mon, categoria:cat, revisado:true
+      }));
+    } else {
+      // Pago directo → va a ingresos con signo negativo (gasto directo)
+      // Usamos un endpoint especial: POST /gastos_directos
+      var d = await apiFetch("/gastos_directos","POST",{
+        categoria: cat, descripcion: desc,
+        mes: curMes, anio: curAnio,
+        monto: monto, moneda: mon
+      });
+      // Add to local list for immediate display
+      if (!window.gastosDirect) window.gastosDirect = [];
+      window.gastosDirect.push(d.gasto||{categoria:cat,descripcion:desc,monto:monto,moneda:mon});
+    }
+    document.getElementById("new-pago-desc").value = "";
+    document.getElementById("new-pago-monto").value = "";
+    await loadAll();
     toast("Pago registrado ✓");
   } catch(e) { toast(e.message,"err"); }
 }
+
 
 function dismissAlert(btn, msg) {
   if (!window._dismissedAlerts) window._dismissedAlerts = new Set();
