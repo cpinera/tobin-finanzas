@@ -403,7 +403,7 @@ body {
 <!-- Nav -->
 <div class="nav">
   <button class="nav-tab active" id="tab-resumen"  onclick="switchTab('resumen')">Resumen</button>
-  <button class="nav-tab"        id="tab-fijos"    onclick="switchTab('fijos')">Gastos fijos</button>
+  <button class="nav-tab"        id="tab-directos"    onclick="switchTab('directos')">Gastos directos</button>
   <button class="nav-tab"        id="tab-ingresos" onclick="switchTab('ingresos')">Ingresos</button>
   <button class="nav-tab"        id="tab-cartolas" onclick="switchTab('cartolas')">Cartolas TC</button>
   <button class="nav-tab"        id="tab-subs"     onclick="switchTab('subs')">Suscripciones</button>
@@ -418,7 +418,7 @@ body {
       <div class="kpi-sub" id="k-ing-sub">0 registros</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Gastos fijos</div>
+      <div class="kpi-label">Gastos directos</div>
       <div class="kpi-val mono" id="k-fijos">$0</div>
       <div class="kpi-sub" id="k-fijos-sub">0 pagados</div>
     </div>
@@ -449,11 +449,11 @@ body {
     </div>
   </div>
 
-  <!-- Gastos fijos pendientes -->
+  <!-- Gastos directos pendientes -->
   <div class="sec">
     <div class="sec-head" onclick="toggleSec('pend')">
       <span class="sec-icon">📋</span>
-      <span class="sec-title">Gastos fijos pendientes</span>
+      <span class="sec-title">Gastos directos pendientes</span>
       <span class="sec-badge warn" id="badge-pend">0</span>
       <span class="sec-arrow" id="arr-pend">▶</span>
     </div>
@@ -482,20 +482,43 @@ body {
 </div>
 
 <!-- ══ GASTOS FIJOS ══ -->
-<div id="view-fijos" class="main" style="display:none">
+<div id="view-directos" class="main" style="display:none">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div>
-      <div style="font-size:20px;font-weight:700" id="fijos-titulo">Gastos fijos</div>
+      <div style="font-size:20px;font-weight:700" id="directos-titulo">Gastos directos</div>
       <div style="font-size:13px;color:var(--muted);margin-top:3px">Los TC se completan automáticamente al analizar cartolas</div>
     </div>
     <button class="btn btn-ghost" onclick="generarMes()">+ Iniciar mes</button>
   </div>
 
   <!-- Manual transfers -->
-  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Transferencia directa</div>
+  <!-- Manual add payment -->
+  <div class="sec" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;padding:13px 20px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);flex:1">Agregar pago manual</span>
+    </div>
+    <div class="add-row" style="flex-wrap:wrap;gap:8px">
+      <select class="add-sel" id="new-pago-cat">
+        <option value="Creditos">Créditos</option>
+        <option value="Sueldos">Sueldos</option>
+        <option value="Uber Eats">Uber Eats</option>
+        <option value="Viajes">Viajes</option>
+        <option value="Shopping">Shopping</option>
+        <option value="Suscripciones">Suscripciones</option>
+        <option value="Cuentas">Cuentas</option>
+        <option value="Colegios">Colegios</option>
+        <option value="Otros">Otros</option>
+      </select>
+      <input class="add-inp" id="new-pago-desc" placeholder="Descripción (ej: Hip. Oficina)" style="flex:1;min-width:140px"/>
+      <input class="add-inp" id="new-pago-monto" type="number" placeholder="Monto CLP" style="width:130px"/>
+      <select class="add-sel" id="new-pago-mon"><option value="CLP">CLP</option><option value="USD">USD</option></select>
+      <button class="btn btn-dark" onclick="addPagoManual()">+ Registrar</button>
+    </div>
+  </div>
+
+  <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">Checklist de pagos recurrentes</div>
   <div id="gf-manual-list"></div>
 
-  <!-- TC auto -->
   <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:20px 0 8px">Via tarjeta de crédito (auto-detectado)</div>
   <div id="gf-tc-list"></div>
 </div>
@@ -606,7 +629,7 @@ var MESES  = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto",
 var curMes, curAnio;
 var gfRegs = {}, ingList = [], movList = [], tcPending = [], tcFiles = [];
 
-// ── Gastos fijos: separados en manuales (transferencia) y TC (auto) ──
+// ── Gastos directos: separados en manuales (transferencia) y TC (auto) ──
 var GF_MANUAL = [
   // [id, categoria, nombre]
   [10, "Créditos",     "Hipotecario Oficina"],
@@ -660,12 +683,18 @@ var SUBS_CONOCIDAS = [
 ];
 
 var CAT_COLORS = {
-  "Alimentacion Familia":"#1a6b3c","Viajes":"#b86c1a","Ropa/Shopping":"#5a3a8c",
-  "Salud":"#b83232","Software":"#1a4a8c","Suscripciones":"#1a4a8c",
-  "Deporte":"#1a6b3c","Restaurantes":"#b86c1a","Transporte":"#7a7469",
-  "Entretenimiento":"#5a3a8c","Educacion":"#1a4a8c","Hogar":"#5a3a8c",
-  "Colegios":"#1a6b3c","Seguros":"#b86c1a","Servicios":"#1a4a8c","Otros":"#b0a99f"
+  "Viajes":         "#b86c1a",
+  "Uber Eats":      "#1a6b3c",
+  "Shopping":       "#5a3a8c",
+  "Suscripciones":  "#1a4a8c",
+  "Colegios":       "#1a6b3c",
+  "Cuentas":        "#7a7469",
+  "Creditos":       "#b83232",
+  "Sueldos":        "#b0a99f",
+  "Otros":          "#b0a99f"
 };
+
+var CATS = ["Viajes","Uber Eats","Shopping","Suscripciones","Colegios","Cuentas","Creditos","Sueldos","Otros"];
 
 // ── Utils ──
 function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -729,7 +758,7 @@ function toggleSec(id) {
 async function loadAll() {
   curMes  = parseInt(get("sel-mes"));
   curAnio = parseInt(get("sel-anio"));
-  set("fijos-titulo","Gastos fijos · "+MESES[curMes-1]+" "+curAnio);
+  set("directos-titulo","Gastos directos · "+MESES[curMes-1]+" "+curAnio);
   try {
     var results = await Promise.allSettled([
       apiFetch("/gf/registros?mes="+curMes+"&anio="+curAnio),
@@ -931,10 +960,18 @@ function renderResumen() {
   if (highTC.length > 0) {
     alertas.push({type:"info", icon:"💡", msg: highTC.length+" gasto(s) sobre $500.000 en TC: "+highTC.map(function(m){return m.descripcion+" ($"+fmt(m.monto)+")";}).join(", ")});
   }
+  // Merge with existing dismissed set
+  if (!window._dismissedAlerts) window._dismissedAlerts = new Set();
   var alertWrap = document.getElementById("alertas-wrap");
   if (alertWrap) {
-    alertWrap.innerHTML = alertas.map(function(a) {
-      return '<div class="alert '+a.type+'"><span class="alert-icon">'+a.icon+'</span><span>'+a.msg+'</span></div>';
+    var filtered = alertas.filter(function(a){ return !window._dismissedAlerts.has(a.msg); });
+    alertWrap.innerHTML = filtered.map(function(a,i) {
+      return '<div class="alert '+a.type+'" id="alert-'+i+'" style="position:relative">'
+        +'<span class="alert-icon">'+a.icon+'</span>'
+        +'<span style="flex:1">'+a.msg+'</span>'
+        +'<button onclick="dismissAlert(this,\'' + a.msg.replace(/'/g,"\\'") + '\')" '
+        +'style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 4px;line-height:1;flex-shrink:0">✕</button>'
+        +'</div>';
     }).join("");
   }
 
@@ -985,6 +1022,39 @@ function renderResumen() {
 }
 
 // ── Nota ──
+async function addPagoManual() {
+  var cat   = document.getElementById("new-pago-cat").value;
+  var desc  = document.getElementById("new-pago-desc").value.trim();
+  var monto = parseFloat(document.getElementById("new-pago-monto").value)||0;
+  var mon   = document.getElementById("new-pago-mon").value;
+  if (!desc)  { toast("Escribe una descripción","err"); return; }
+  if (!monto) { toast("Ingresa un monto","err"); return; }
+  try {
+    var d = await apiFetch("/movimientos_tc","POST",{
+      tarjeta:"Manual",
+      mes:curMes, anio:curAnio,
+      fecha:new Date().toISOString().slice(0,10),
+      descripcion:desc, monto:monto, moneda:mon,
+      categoria:cat, es_gasto_fijo:false, revisado:true
+    });
+    movList.push(Object.assign({},d.movimiento||{},{
+      tarjeta:"Manual", descripcion:desc, monto:monto,
+      moneda:mon, categoria:cat, revisado:true
+    }));
+    document.getElementById("new-pago-desc").value="";
+    document.getElementById("new-pago-monto").value="";
+    renderMovs(); renderResumen();
+    toast("Pago registrado ✓");
+  } catch(e) { toast(e.message,"err"); }
+}
+
+function dismissAlert(btn, msg) {
+  if (!window._dismissedAlerts) window._dismissedAlerts = new Set();
+  window._dismissedAlerts.add(msg);
+  var el = btn.closest('.alert');
+  if (el) el.style.transition="opacity .2s", el.style.opacity="0", setTimeout(function(){el.remove();},200);
+}
+
 async function saveNota() {
   var nota = document.getElementById("nota-ta").value;
   try {
@@ -1194,7 +1264,7 @@ async function tcAnalizar() {
       chatAddMsg("bot","Tengo "+tcPending.length+" gasto(s) que necesito confirmar contigo.\n\nGasto de $"+fmt(f.monto)+" en \""+f.descripcion+"\" ("+(f.fecha||"sin fecha")+")\n¿Qué es? (Ej: Restaurantes, Salud, Hogar, Suscripciones, Viajes...)");
     },400);
   } else if (valid.length>0) {
-    chatAddMsg("bot","✅ Todo procesado. Los datos ya están actualizados en Resumen y Gastos fijos.");
+    chatAddMsg("bot","✅ Todo procesado. Los datos ya están actualizados en Resumen y Gastos directos.");
     set("chat-title","Análisis completo");
   }
 }
@@ -1242,10 +1312,13 @@ function renderSubsDetectadas() {
 
   var el = document.getElementById("subs-wrap");
   if (!el) return;
-  var alertHtml = '<div class="alert warn" style="margin-bottom:12px">'
+  var subsMsg = nuevas.length+' suscripción(es) nueva(s): '+nuevas.map(function(m){ return m.descripcion+" ($"+fmt(m.monto)+")"; }).join(", ");
+  if (window._dismissedAlerts && window._dismissedAlerts.has(subsMsg)) return;
+  var alertHtml = '<div class="alert warn" style="margin-bottom:12px;position:relative">'
     +'<span class="alert-icon">🔔</span>'
-    +'<div><strong>'+nuevas.length+' suscripción(es) nueva(s) detectada(s) este mes:</strong><br>'
+    +'<div style="flex:1"><strong>'+nuevas.length+' suscripción(es) nueva(s) detectada(s):</strong><br>'
     +nuevas.map(function(m){ return m.descripcion+" ($"+fmt(m.monto)+")"; }).join(", ")+'</div>'
+    +'<button onclick="dismissAlert(this,\''+subsMsg.replace(/'/g,"\\'")+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 4px">✕</button>'
     +'</div>';
   el.innerHTML = alertHtml + el.innerHTML;
 }
