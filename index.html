@@ -671,6 +671,7 @@ var HDR    = {"Content-Type":"application/json","x-api-key":"tobin2024"};
 var MESES  = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 var curMes, curAnio;
 var gfRegs = {}, ingList = [], movList = [], tcPending = [], tcFiles = [];
+window.gastosDirect = window.gastosDirect || [];
 
 // ── Gastos directos: separados en manuales (transferencia) y TC (auto) ──
 // GF arrays loaded from Supabase gf_items table
@@ -807,7 +808,7 @@ async function loadAll() {
       var ta = document.getElementById("nota-ta");
       if (ta) ta.value = results[4].value.nota||"";
     }
-    window.gastosDirect = results[5].status==="fulfilled" ? (results[5].value.gastos||[]) : [];
+    window.gastosDirect = (results[5] && results[5].status==="fulfilled") ? (results[5].value.gastos||[]) : (window.gastosDirect||[]);
     renderAll();
   } catch(e) {
     toast("Error cargando datos: "+e.message,"err");
