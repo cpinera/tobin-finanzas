@@ -1036,18 +1036,27 @@ async function delMov(id) {
 function renderSubs() {
   var el = document.getElementById("subs-wrap"); if(!el) return;
   var cats = {};
-  SUBS.forEach(function(s){if(!cats[s.cat])cats[s.cat]=[];cats[s.cat].push(s);});
+  SUBS.forEach(function(s,i){if(!cats[s.cat])cats[s.cat]=[];cats[s.cat].push({s:s,i:i});});
   var total = SUBS.reduce(function(s,x){return s+x.clp;},0);
   var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow)">'
     + '<div><div style="font-size:13px;font-weight:700;color:var(--muted)">Total mensual en suscripciones</div>'
-    + '<div style="font-size:11px;color:var(--muted2);margin-top:2px">28 suscripciones activas</div></div>'
+    + '<div style="font-size:11px;color:var(--muted2);margin-top:2px">'+SUBS.length+' suscripciones activas</div></div>'
     + '<div style="font-size:20px;font-weight:800;color:var(--red)">~$'+total.toLocaleString("es-CL")+'/mes</div></div>';
   Object.entries(cats).forEach(function(entry) {
     var cat=entry[0], items=entry[1];
-    var catT=items.reduce(function(s,x){return s+x.clp;},0);
+    var catT=items.reduce(function(s,x){return s+x.s.clp;},0);
     html+='<div class="card"><div class="subs-cat-head"><span>'+cat+'</span><span style="color:var(--text)">$'+catT.toLocaleString("es-CL")+'/mes</span></div><div class="subs-grid">';
-    items.forEach(function(s){
-      html+='<div class="sub-card"><div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px"><span style="font-size:20px">'+s.icon+'</span><div><div style="font-size:13px;font-weight:700">'+s.n+'</div><div style="font-size:11px;color:var(--muted)">'+s.who+'</div></div></div><div style="font-size:15px;font-weight:800">'+s.amt+'</div><div style="font-size:10px;color:var(--muted2);margin-top:2px">~$'+s.clp.toLocaleString("es-CL")+' CLP</div></div>';
+    items.forEach(function(x){
+      var s=x.s, i=x.i;
+      html+='<div class="sub-card" id="sub-card-'+i+'" style="position:relative">'
+        +'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">'
+        +'<button onclick="editSub('+i+')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted2);padding:2px 5px;border-radius:4px" title="Editar">✏️</button>'
+        +'<button onclick="delSub('+i+')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted2);padding:2px 5px;border-radius:4px" title="Eliminar">✕</button>'
+        +'</div>'
+        +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding-right:44px"><span style="font-size:20px">'+s.icon+'</span><div><div style="font-size:13px;font-weight:700">'+s.n+'</div><div style="font-size:11px;color:var(--muted)">'+s.who+'</div></div></div>'
+        +'<div style="font-size:15px;font-weight:800">'+s.amt+'</div>'
+        +'<div style="font-size:10px;color:var(--muted2);margin-top:2px">~$'+s.clp.toLocaleString("es-CL")+' CLP</div>'
+        +'</div>';
     });
     html+='</div></div>';
   });
@@ -1182,37 +1191,7 @@ function loadSubs() {
 }
 loadSubs();
 
-// Override renderSubs to add delete buttons
-var _origRenderSubs = renderSubs;
-renderSubs = function() {
-  renderGastosDirectos(); // also refresh on tab switch
-  var el = document.getElementById('subs-wrap'); if(!el) return;
-  var cats = {};
-  SUBS.forEach(function(s,i){if(!cats[s.cat])cats[s.cat]=[];cats[s.cat].push({s:s,i:i});});
-  var total = SUBS.reduce(function(s,x){return s+x.clp;},0);
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow)">'
-    + '<div><div style="font-size:13px;font-weight:700;color:var(--muted)">Total mensual en suscripciones</div>'
-    + '<div style="font-size:11px;color:var(--muted2);margin-top:2px">' + SUBS.length + ' suscripciones activas</div></div>'
-    + '<div style="font-size:20px;font-weight:800;color:var(--red)">~$'+total.toLocaleString('es-CL')+'/mes</div></div>';
-  Object.entries(cats).forEach(function(entry) {
-    var cat=entry[0], items=entry[1];
-    var catT=items.reduce(function(s,x){return s+x.s.clp;},0);
-    html+='<div class="card" style="margin-bottom:10px"><div class="subs-cat-head"><span>'+cat+'</span><span style="color:var(--text)">$'+catT.toLocaleString('es-CL')+'/mes</span></div><div class="subs-grid">';
-    items.forEach(function(x){
-      var s=x.s, i=x.i;
-      html+='<div class="sub-card" id="sub-card-'+i+'" style="position:relative">'
-        +'<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">'
-        +'<button onclick="editSub('+i+')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted2);padding:2px 5px;border-radius:4px" title="Editar">✏️</button>'
-        +'<button onclick="delSub('+i+')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted2);padding:2px 5px;border-radius:4px" title="Eliminar">✕</button>'
-        +'</div>'
-        +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding-right:44px"><span style="font-size:20px">'+s.icon+'</span><div><div style="font-size:13px;font-weight:700">'+s.n+'</div><div style="font-size:11px;color:var(--muted)">'+s.who+'</div></div></div>'
-        +'<div style="font-size:15px;font-weight:800">'+s.amt+'</div>'
-        +'<div style="font-size:10px;color:var(--muted2);margin-top:2px">~$'+s.clp.toLocaleString('es-CL')+' CLP</div></div>';
-    });
-    html+='</div></div>';
-  });
-  el.innerHTML = html;
-};
+
 
 
 function editSub(idx) {
