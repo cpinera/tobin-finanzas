@@ -153,9 +153,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="tabs">
   <button class="tab active" id="tab-resumen"  onclick="switchTab('resumen')">📊 Resumen</button>
-  <button class="tab"        id="tab-directos"   onclick="switchTab('directos')">Gastos directos</button>
+  <button class="tab"        id="tab-gastos"   onclick="switchTab('gastos')">📋 Gastos fijos</button>
   <button class="tab"        id="tab-ingresos" onclick="switchTab('ingresos')">💰 Ingresos</button>
-  <button class="tab"        id="tab-cartolas"       onclick="switchTab('cartolas')">Cartolas TC</button>
+  <button class="tab"        id="tab-tc"       onclick="switchTab('tc')">💳 Análisis TC</button>
   <button class="tab"        id="tab-subs"     onclick="switchTab('subs')">📡 Suscripciones</button>
 </div>
 
@@ -163,7 +163,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div id="view-resumen" class="main">
   <div class="kpis">
     <div class="kpi green"><div class="kpi-label">💰 Ingresos</div><div class="kpi-val" id="k-ing" style="color:var(--green)">$0</div><div class="kpi-sub" id="k-ing-sub">0 registros</div></div>
-    <div class="kpi"><div class="kpi-label">Gastos directos</div><div class="kpi-val" id="k-fijos">$0</div><div class="kpi-sub" id="k-fijos-sub">— pagados</div></div>
+    <div class="kpi"><div class="kpi-label">📋 Gastos fijos</div><div class="kpi-val" id="k-fijos">$0</div><div class="kpi-sub" id="k-fijos-sub">— pagados</div></div>
     <div class="kpi"><div class="kpi-label">💳 Gastos TC</div><div class="kpi-val" id="k-tc">$0</div><div class="kpi-sub" id="k-tc-sub">0 movimientos</div></div>
     <div class="kpi" id="k-balance-card"><div class="kpi-label">⚖️ Balance</div><div class="kpi-val" id="k-balance">$0</div><div class="kpi-sub">ingresos − gastos</div></div>
   </div>
@@ -194,14 +194,62 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- GASTOS FIJOS -->
-<div id="view-directos" class="main" style="display:none">
+<div id="view-gastos" class="main" style="display:none">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div>
-      <div style="font-size:20px;font-weight:800" id="gf-titulo">Gastos directos</div>
+      <div style="font-size:20px;font-weight:800" id="gf-titulo">Gastos fijos</div>
       <div style="font-size:13px;color:var(--muted);margin-top:2px" id="gf-sub"></div>
     </div>
-    <button class="btn btn-outline" style="font-size:13px" onclick="generarMes()">+ Generar mes</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="font-size:13px" onclick="showGastoDirectoForm()">+ Agregar gasto</button>
+      <button class="btn btn-outline" style="font-size:13px" onclick="generarMes()">+ Generar mes</button>
+    </div>
   </div>
+  <!-- Form agregar gasto directo -->
+  <div id="gasto-directo-form" style="display:none;background:var(--blue-l);border:1px solid rgba(37,99,235,.2);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--blue)">Agregar gasto directo</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Categoría</div>
+        <select class="add-sel" id="gd-cat">
+          <option value="Créditos">Créditos</option>
+          <option value="Sueldos">Sueldos</option>
+          <option value="Trimestrales">Trimestrales</option>
+          <option value="Colegios">Colegios</option>
+          <option value="Seguros">Seguros</option>
+          <option value="Servicios">Servicios</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Descripción</div>
+        <input class="add-inp" id="gd-desc" placeholder="Ej: Hipotecario BCI" style="width:100%"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Monto</div>
+        <input class="add-inp" id="gd-monto" type="number" placeholder="0" style="width:120px"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Moneda</div>
+        <select class="add-sel" id="gd-mon"><option value="CLP">CLP</option><option value="USD">USD</option></select>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Tipo</div>
+        <select class="add-sel" id="gd-tipo">
+          <option value="permanente">🔁 Permanente</option>
+          <option value="esporadico">1️⃣ Solo este mes</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="addGastoDirecto()">Guardar</button>
+        <button class="btn btn-outline" onclick="document.getElementById('gasto-directo-form').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de gastos directos del mes -->
+  <div id="gastos-directos-list" style="margin-bottom:16px"></div>
+
   <div id="gf-list"></div>
 </div>
 
@@ -237,7 +285,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- ANÁLISIS TC -->
-<div id="view-cartolas" class="main" style="display:none">
+<div id="view-tc" class="main" style="display:none">
   <div style="font-size:20px;font-weight:800;margin-bottom:20px">Análisis de Tarjetas de Crédito</div>
 
   <div class="card">
@@ -314,6 +362,46 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <!-- SUSCRIPCIONES -->
 <div id="view-subs" class="main" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="font-size:20px;font-weight:800">Suscripciones</div>
+    <button class="btn btn-outline" style="font-size:13px" onclick="showAddSub()">+ Agregar</button>
+  </div>
+
+  <!-- Form agregar suscripción -->
+  <div id="sub-form" style="display:none;background:var(--blue-l);border:1px solid rgba(37,99,235,.2);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--blue)">Nueva suscripción</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Categoría</div>
+        <select class="add-sel" id="ns-cat">
+          <option>🤖 IA</option><option>💼 Trabajo</option><option>📺 Streaming</option>
+          <option>🏋️ Deporte</option><option>🎮 Juegos</option><option>👦 Niños</option>
+          <option>☁️ Cloud</option><option>🐦 Redes</option><option>Otro</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:130px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Nombre</div>
+        <input class="add-inp" id="ns-nombre" placeholder="Ej: Disney+" style="width:100%"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Para quién</div>
+        <input class="add-inp" id="ns-who" placeholder="Ej: Familia" style="width:110px"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Monto CLP/mes</div>
+        <input class="add-inp" id="ns-clp" type="number" placeholder="0" style="width:110px"/>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Monto mostrar</div>
+        <input class="add-inp" id="ns-amt" placeholder="Ej: US$9.99/mes" style="width:130px"/>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveNewSub()">Guardar</button>
+        <button class="btn btn-outline" onclick="document.getElementById('sub-form').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="subs-wrap"></div>
 </div>
 
@@ -442,7 +530,7 @@ function onMesChange() {
 }
 
 function switchTab(tab) {
-  ["resumen","directos","ingresos","cartolas","subs"].forEach(function(t) {
+  ["resumen","gastos","ingresos","tc","subs"].forEach(function(t) {
     document.getElementById("view-"+t).style.display = t === tab ? "block" : "none";
     document.getElementById("tab-"+t).className = "tab" + (t === tab ? " active" : "");
   });
@@ -965,6 +1053,164 @@ function renderSubs() {
   });
   el.innerHTML = html;
 }
+
+// ── Gastos Directos ──
+var gastosDirectosList = JSON.parse(localStorage.getItem('gastos_directos') || '[]');
+
+function showGastoDirectoForm() {
+  var f = document.getElementById('gasto-directo-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function addGastoDirecto() {
+  var cat   = document.getElementById('gd-cat').value;
+  var desc  = document.getElementById('gd-desc').value.trim();
+  var monto = parseFloat(document.getElementById('gd-monto').value) || 0;
+  var mon   = document.getElementById('gd-mon').value;
+  var tipo  = document.getElementById('gd-tipo').value;
+  if (!desc)  { toast('Escribe una descripción', 'err'); return; }
+  if (!monto) { toast('Ingresa un monto', 'err'); return; }
+
+  var gasto = {
+    id: Date.now(),
+    cat: cat, desc: desc, monto: monto, mon: mon,
+    tipo: tipo, mes: curMes, anio: curAnio
+  };
+  gastosDirectosList.push(gasto);
+  saveGastosDirectos();
+  document.getElementById('gd-desc').value = '';
+  document.getElementById('gd-monto').value = '';
+  document.getElementById('gasto-directo-form').style.display = 'none';
+  renderGastosDirectos();
+  toast('Gasto agregado ✓');
+}
+
+function saveGastosDirectos() {
+  localStorage.setItem('gastos_directos', JSON.stringify(gastosDirectosList));
+}
+
+function delGastoDirecto(id, permanente) {
+  if (permanente) {
+    if (!confirm('¿Eliminar permanentemente? Si no, puedes marcarlo como N/A.')) return;
+  }
+  gastosDirectosList = gastosDirectosList.filter(function(g) { return g.id !== id; });
+  saveGastosDirectos();
+  renderGastosDirectos();
+  toast('Eliminado');
+}
+
+function renderGastosDirectos() {
+  var el = document.getElementById('gastos-directos-list'); if (!el) return;
+  // Filter: show permanent always + this month's sporadic
+  var visible = gastosDirectosList.filter(function(g) {
+    if (g.tipo === 'permanente') return true;
+    return g.mes === curMes && g.anio === curAnio;
+  });
+  if (!visible.length) { el.innerHTML = ''; return; }
+
+  // Group by category
+  var cats = {};
+  visible.forEach(function(g) {
+    if (!cats[g.cat]) cats[g.cat] = [];
+    cats[g.cat].push(g);
+  });
+
+  var html = '';
+  Object.keys(cats).forEach(function(cat) {
+    var items = cats[cat];
+    var total = items.reduce(function(s,g){ return s+(parseFloat(g.monto)||0); }, 0);
+    html += '<div class="card" style="margin-bottom:10px">';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--surface2);border-bottom:1px solid var(--border)">';
+    html += '<span style="font-size:14px;font-weight:700;flex:1">' + esc(cat) + '</span>';
+    html += '<span class="card-badge">$' + total.toLocaleString('es-CL') + '</span>';
+    html += '</div>';
+    items.forEach(function(g) {
+      var isP = g.tipo === 'permanente';
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border)">';
+      html += '<div style="flex:1"><div style="font-size:13px;font-weight:500">' + esc(g.desc) + '</div>';
+      html += '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (isP ? '🔁 Permanente' : '1️⃣ Solo este mes') + '</div></div>';
+      html += '<div style="font-size:13px;font-weight:600;color:var(--blue)">$' + (parseFloat(g.monto)||0).toLocaleString('es-CL') + ' ' + (g.mon||'CLP') + '</div>';
+      html += '<button class="btn-ghost" style="font-size:14px;color:var(--red)" onclick="delGastoDirecto(' + g.id + ',' + isP + ')">✕</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ── Suscripciones editables ──
+function showAddSub() {
+  var f = document.getElementById('sub-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveNewSub() {
+  var cat    = document.getElementById('ns-cat').value;
+  var nombre = document.getElementById('ns-nombre').value.trim();
+  var who    = document.getElementById('ns-who').value.trim() || '?';
+  var clp    = parseInt(document.getElementById('ns-clp').value) || 0;
+  var amt    = document.getElementById('ns-amt').value.trim() || ('$' + clp.toLocaleString('es-CL') + '/mes');
+  if (!nombre) { toast('Escribe un nombre', 'err'); return; }
+  SUBS.push({cat:cat, icon:'📌', n:nombre, who:who, clp:clp, amt:amt});
+  saveSubs();
+  document.getElementById('ns-nombre').value = '';
+  document.getElementById('ns-who').value = '';
+  document.getElementById('ns-clp').value = '';
+  document.getElementById('ns-amt').value = '';
+  document.getElementById('sub-form').style.display = 'none';
+  renderSubs();
+  toast('Suscripción agregada ✓');
+}
+
+function delSub(idx) {
+  if (!confirm('¿Eliminar esta suscripción?')) return;
+  SUBS.splice(idx, 1);
+  saveSubs();
+  renderSubs();
+  toast('Eliminada');
+}
+
+function saveSubs() {
+  localStorage.setItem('subs_custom', JSON.stringify(SUBS));
+}
+
+function loadSubs() {
+  var saved = localStorage.getItem('subs_custom');
+  if (saved) {
+    try { SUBS = JSON.parse(saved); } catch(e) {}
+  }
+}
+loadSubs();
+
+// Override renderSubs to add delete buttons
+var _origRenderSubs = renderSubs;
+renderSubs = function() {
+  renderGastosDirectos(); // also refresh on tab switch
+  var el = document.getElementById('subs-wrap'); if(!el) return;
+  var cats = {};
+  SUBS.forEach(function(s,i){if(!cats[s.cat])cats[s.cat]=[];cats[s.cat].push({s:s,i:i});});
+  var total = SUBS.reduce(function(s,x){return s+x.clp;},0);
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow)">'
+    + '<div><div style="font-size:13px;font-weight:700;color:var(--muted)">Total mensual en suscripciones</div>'
+    + '<div style="font-size:11px;color:var(--muted2);margin-top:2px">' + SUBS.length + ' suscripciones activas</div></div>'
+    + '<div style="font-size:20px;font-weight:800;color:var(--red)">~$'+total.toLocaleString('es-CL')+'/mes</div></div>';
+  Object.entries(cats).forEach(function(entry) {
+    var cat=entry[0], items=entry[1];
+    var catT=items.reduce(function(s,x){return s+x.s.clp;},0);
+    html+='<div class="card" style="margin-bottom:10px"><div class="subs-cat-head"><span>'+cat+'</span><span style="color:var(--text)">$'+catT.toLocaleString('es-CL')+'/mes</span></div><div class="subs-grid">';
+    items.forEach(function(x){
+      var s=x.s, i=x.i;
+      html+='<div class="sub-card" style="position:relative">'
+        +'<button onclick="delSub('+i+')" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted2);padding:2px 4px;border-radius:4px" title="Eliminar">✕</button>'
+        +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding-right:20px"><span style="font-size:20px">'+s.icon+'</span><div><div style="font-size:13px;font-weight:700">'+s.n+'</div><div style="font-size:11px;color:var(--muted)">'+s.who+'</div></div></div>'
+        +'<div style="font-size:15px;font-weight:800">'+s.amt+'</div>'
+        +'<div style="font-size:10px;color:var(--muted2);margin-top:2px">~$'+s.clp.toLocaleString('es-CL')+' CLP</div></div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML = html;
+};
+
 </script>
 </body>
 </html>
